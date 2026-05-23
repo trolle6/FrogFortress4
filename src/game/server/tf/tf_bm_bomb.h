@@ -22,6 +22,7 @@ public:
 
 	int m_iCellX;
 	int m_iCellY;
+	float m_flPlaceTime;
 	float m_flDetonateTime;
 	int m_iBlastRange;
 	EHANDLE m_hOwnerPlayer;

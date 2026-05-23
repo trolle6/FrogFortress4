@@ -2157,9 +2157,13 @@ void CTFPlayer::PostSpawnThink( void )
 	if ( IsAlive() && TFGameRules()
 		&& ( TFGameRules()->IsBombermanMode() || tf_ff_game_mode.GetInt() == TF_FF_MODE_BOMBERMAN ) )
 	{
-		if ( !m_bBMSpawnConfigured )
+		extern bool BM_IsPlayerAtArenaSpawn( CTFPlayer *pPlayer );
+		extern bool BM_PlacePlayerAtArenaSpawn( CTFPlayer *pPlayer, bool bForcePlacement );
+		BM_OnPlayerSpawn( this );
+		// GetPlayerSpawnSpot is authoritative; one safety retry if still off-grid (arena built late).
+		if ( !m_bBMSpawnConfigured && !BM_IsPlayerAtArenaSpawn( this ) )
 		{
-			if ( BM_OnPlayerSpawn( this ) )
+			if ( BM_PlacePlayerAtArenaSpawn( this, true ) )
 			{
 				m_bBMSpawnConfigured = true;
 			}
@@ -5841,19 +5845,19 @@ CBaseEntity* CTFPlayer::EntSelectSpawnPoint()
 	const char *pSpawnPointName = "";
 
 #ifdef SOURCESDK
-	if ( TFGameRules()
-		&& ( TFGameRules()->IsBombermanMode() || tf_ff_game_mode.GetInt() == TF_FF_MODE_BOMBERMAN )
-		&& ( GetTeamNumber() == TF_TEAM_RED || GetTeamNumber() == TF_TEAM_BLUE ) )
+	if ( TFGameRules() )
 	{
+		extern bool BM_PlayerUsesArenaGridSpawn( CTFPlayer *pPlayer );
 		extern CBaseEntity *BM_GetSkySpawnEntity( CTFPlayer *pPlayer );
-		extern bool BM_IsMapFloorArena( void );
-		if ( BM_IsMapFloorArena() )
+		if ( BM_PlayerUsesArenaGridSpawn( this ) )
 		{
 			CBaseEntity *pBMSpot = BM_GetSkySpawnEntity( this );
 			if ( pBMSpot )
 			{
 				return pBMSpot;
 			}
+			Warning( "BM spawn: EntSelectSpawnPoint — grid spawn entity missing for %s (arena not ready?).\n",
+				GetPlayerName() );
 		}
 	}
 #endif

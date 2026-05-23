@@ -29,7 +29,10 @@ void BM_DestroyCrateAtCell( int iCellX, int iCellY );
 void BM_BuildArena( bool bWarpAllPlayers = false, bool bForceRebuild = false );
 bool BM_EnsureArenaBuilt( void );
 bool BM_ComputeArenaSpawnWorldPos( CTFPlayer *pPlayer, Vector &vecDest );
+// Single authoritative spawn placement (grid XY + play-floor Z on itemtest).
+bool BM_PlacePlayerAtArenaSpawn( CTFPlayer *pPlayer, bool bForcePlacement = false );
 bool BM_ApplyArenaSpawnToPlayer( CTFPlayer *pPlayer );
+bool BM_IsPlayerAtArenaSpawn( CTFPlayer *pPlayer );
 void BM_ResetArenaSpawnDebounce( CTFPlayer *pPlayer );
 void BM_ClearArena( void );
 void BM_RemoveAllBombs( void );

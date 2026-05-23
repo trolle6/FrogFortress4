@@ -6,6 +6,8 @@
 
 bool BM_IsArenaActive( void );
 bool BM_IsBomberGameplayActive( void );
+// True when this player must use BM_PlacePlayerAtArenaSpawn (never map teamspawns).
+bool BM_PlayerUsesArenaGridSpawn( CTFPlayer *pPlayer );
 bool BM_IsMapFloorArena( void );
 bool BM_IsInsideItemtestPlayRoom( const Vector &vecPos );
 void BM_GetPlayAreaWorldBounds( float &flMinX, float &flMinY, float &flMaxX, float &flMaxY );

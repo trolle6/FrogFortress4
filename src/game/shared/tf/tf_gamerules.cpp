@@ -916,7 +916,7 @@ ConVar tf_ff_game_mode( "tf_ff_game_mode", "3", FCVAR_REPLICATED | FCVAR_NOTIFY,
 #endif
 );
 ConVar tf_bm_respawn_time( "tf_bm_respawn_time", "2", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: respawn delay after dying to a blast." );
-ConVar tf_bm_build_id( "tf_bm_build_id", "reset-v21-free-roam", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman build tag (confirms DLL build)." );
+ConVar tf_bm_build_id( "tf_bm_build_id", "bomber-free-move", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman build tag (confirms DLL build)." );
 ConVar tf_rim_mode( "tf_rim_mode", "0", FCVAR_REPLICATED | FCVAR_NOTIFY, "Rainbow Is Magic: archived hostage mode (0=off). Prefer tf_ff_game_mode or ff_mode."
 #ifdef GAME_DLL
 	, TfRimModeChanged
@@ -10668,37 +10668,43 @@ CBaseEntity *CTFGameRules::GetPlayerSpawnSpot( CBasePlayer *pPlayer )
 	// get valid spawn point
 	CBaseEntity *pSpawnSpot = pPlayer->EntSelectSpawnPoint();
 
+#ifdef SOURCESDK
+	extern bool BM_PlayerUsesArenaGridSpawn( CTFPlayer *pPlayer );
+	const bool bBomberGridSpawn = ( pTFPlayer && BM_PlayerUsesArenaGridSpawn( pTFPlayer ) );
+#else
+	const bool bBomberGridSpawn = false;
+#endif
+
+	if ( !pSpawnSpot )
+	{
+		Warning( "GetPlayerSpawnSpot: no spawn entity for %s.\n", pPlayer->GetPlayerName() );
+		return NULL;
+	}
+
 	Vector vecSpawnPos = pSpawnSpot->GetAbsOrigin();
 
 #ifdef SOURCESDK
-	if ( pTFPlayer
-		&& ( pTFPlayer->GetTeamNumber() == TF_TEAM_RED || pTFPlayer->GetTeamNumber() == TF_TEAM_BLUE )
-		&& ( IsBombermanMode() || tf_ff_game_mode.GetInt() == TF_FF_MODE_BOMBERMAN ) )
+	if ( bBomberGridSpawn )
 	{
-		extern bool BM_EnsureArenaBuilt( void );
-		extern void BM_SetPlayerMovementUnlocked( CTFPlayer *pPlayer, bool bUnlocked );
-		extern void BM_ResetArenaSpawnDebounce( CTFPlayer *pPlayer );
-		extern bool BM_ApplyArenaSpawnToPlayer( CTFPlayer *pPlayer );
+		extern void BM_ApplyDefaultFreeMove( CTFPlayer *pPlayer );
+		extern bool BM_PlacePlayerAtArenaSpawn( CTFPlayer *pPlayer, bool bForcePlacement );
 
-		BM_SetPlayerMovementUnlocked( pTFPlayer, false );
 		if ( pTFPlayer->GetMoveType() == MOVETYPE_NOCLIP )
 		{
 			pTFPlayer->SetMoveType( MOVETYPE_WALK );
 		}
 
-		BM_EnsureArenaBuilt();
-
-		// One authoritative warp per respawn (PostSpawnThink must not re-call EnsurePlayerInArena).
-		if ( !pTFPlayer->m_bBMSpawnConfigured && BM_ApplyArenaSpawnToPlayer( pTFPlayer ) )
+		if ( !BM_PlacePlayerAtArenaSpawn( pTFPlayer, true ) )
 		{
-			pTFPlayer->m_bBMSpawnConfigured = true;
-			vecSpawnPos = pTFPlayer->GetAbsOrigin();
-		}
-		else
-		{
-			Warning( "BM spawn: GetPlayerSpawnSpot could not place %s in play room.\n",
+			Warning( "BM spawn: GetPlayerSpawnSpot could not place %s on arena grid.\n",
 				pTFPlayer->GetPlayerName() );
 		}
+
+		pTFPlayer->m_bBMSpawnConfigured = true;
+		BM_ApplyDefaultFreeMove( pTFPlayer );
+		vecSpawnPos = pTFPlayer->GetAbsOrigin();
+		pSpawnSpot->SetAbsOrigin( vecSpawnPos );
+		pSpawnSpot->SetLocalOrigin( vecSpawnPos );
 	}
 	else
 #endif
@@ -10727,9 +10733,17 @@ bool CTFGameRules::IsSpawnPointValid( CBaseEntity *pSpot, CBasePlayer *pPlayer, 
 	bool bMatchSummary = ShowMatchSummary();
 
 #ifdef SOURCESDK
-	if ( IsBombermanMode() && pSpot && pSpot->ClassMatches( "info_target" ) )
+	if ( IsBombermanMode() && pSpot )
 	{
-		return true;
+		if ( pSpot->ClassMatches( "info_player_teamspawn" ) )
+		{
+			return false;
+		}
+
+		if ( pSpot->ClassMatches( "info_target" ) )
+		{
+			return true;
+		}
 	}
 #endif
 
@@ -18566,11 +18580,11 @@ void CTFGameRules::FF_TickPostMapSetup( void )
 	}
 	else if ( IsBombermanMode() )
 	{
-		extern void BM_RespawnAllPlayers( void );
 		extern void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild );
+		extern void BM_WarpAllPlayersToArenaSpawns( void );
 		BM_BuildArena( false, true );
-		BM_RespawnAllPlayers();
-		UTIL_ClientPrintAll( HUD_PRINTTALK, "Frog Bomber: join a team, pick Scout — grid spawns, MOUSE1 = bomb." );
+		BM_WarpAllPlayersToArenaSpawns();
+		UTIL_ClientPrintAll( HUD_PRINTTALK, "Frog Bomber: join RED/BLU Scout — grid spawns on the play floor. MOUSE1 = bomb." );
 	}
 
 	m_flFFPostMapSetupTime = -1.0f;

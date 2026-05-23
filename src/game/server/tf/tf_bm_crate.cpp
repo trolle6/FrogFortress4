@@ -6,6 +6,7 @@
 #include "tf_bm_crate.h"
 #include "bm_grid.h"
 #include "bm_props.h"
+#include "props.h"
 #include "tf_gamerules.h"
 #include "tf_player.h"
 #include "explode.h"
@@ -15,12 +16,18 @@
 
 LINK_ENTITY_TO_CLASS( tf_bm_crate, CTFBMCrate );
 
+ConVar tf_bm_crate_visible( "tf_bm_crate_visible", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Bomberman: networked wood-crate props for soft walls (required to see the maze)." );
+ConVar tf_bm_crate_scale( "tf_bm_crate_scale", "0.9", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Bomberman: scale for soft-wall crate props." );
+ConVar tf_bm_crate_collide( "tf_bm_crate_collide", "0", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Bomberman: unused — crates use grid blocking only (no prop physics)." );
+
 static const char *const g_BMCrateModels[] = {
-	"models/props_gameplay/orange_cone001.mdl",
+	"models/props_junk/wood_crate001a.mdl",
 	"models/props_farm/wooden_barrel.mdl",
-	"models/props_farm/concrete_block001.mdl",
-	"models/props_halloween/pumpkin_loot.mdl",
-	"models/props_c17/oildrum001.mdl",
+	"models/props_gameplay/orange_cone001.mdl",
+	"models/error.mdl",
 };
 
 //-----------------------------------------------------------------------------
@@ -28,6 +35,7 @@ CTFBMCrate::CTFBMCrate()
 {
 	m_iCellX = 0;
 	m_iCellY = 0;
+	m_hCrateVisual.Set( NULL );
 }
 
 //-----------------------------------------------------------------------------
@@ -42,13 +50,75 @@ void CTFBMCrate::Spawn( void )
 {
 	Precache();
 
-	BM_ApplyPropModelOrHidden( assert_cast<CBaseAnimating *>( this ), g_BMCrateModels, ARRAYSIZE( g_BMCrateModels ), 0.85f );
+	// Logic-only server entity; clients see m_hCrateVisual (prop_dynamic_override).
+	AddEffects( EF_NODRAW | EF_NOSHADOW );
 	SetSolid( SOLID_NONE );
 	SetMoveType( MOVETYPE_NONE );
-	AddEffects( EF_NOSHADOW );
 	SetCollisionGroup( COLLISION_GROUP_DEBRIS );
 
 	BaseClass::Spawn();
+
+	SpawnCrateVisual();
+}
+
+//-----------------------------------------------------------------------------
+void CTFBMCrate::SpawnCrateVisual( void )
+{
+	RemoveCrateVisual();
+
+	const char *pszModel = BM_SelectModel( g_BMCrateModels, ARRAYSIZE( g_BMCrateModels ) );
+	if ( !pszModel )
+	{
+		Warning( "BM crate: no model found — mount TF2 VPKs.\n" );
+		return;
+	}
+
+	CDynamicProp *pProp = dynamic_cast<CDynamicProp *>( CreateEntityByName( "prop_dynamic_override" ) );
+	if ( !pProp )
+	{
+		return;
+	}
+
+	const float flScale = clamp( tf_bm_crate_scale.GetFloat(), 0.25f, 2.0f );
+	const float flCell = BM_GetCellSize();
+	const float flHalfXY = flCell * 0.42f;
+	const float flHalfZ = 36.0f;
+
+	Vector vecOrigin = GetAbsOrigin();
+	vecOrigin.z += 4.0f;
+
+	pProp->SetModel( pszModel );
+	pProp->SetAbsOrigin( vecOrigin );
+	pProp->SetAbsAngles( GetAbsAngles() );
+	pProp->SetModelScale( flScale );
+	pProp->SetSolid( SOLID_NONE );
+	pProp->SetMoveType( MOVETYPE_NONE );
+	pProp->RemoveEffects( EF_NODRAW );
+	pProp->AddEffects( EF_NOSHADOW );
+	// No prop bbox — grid logic blocks movement; avoids standing on crate tops (floating).
+
+	DispatchSpawn( pProp );
+	pProp->Activate();
+
+	m_hCrateVisual.Set( pProp );
+}
+
+//-----------------------------------------------------------------------------
+void CTFBMCrate::RemoveCrateVisual( void )
+{
+	CBaseEntity *pVisual = m_hCrateVisual.Get();
+	if ( pVisual )
+	{
+		UTIL_Remove( pVisual );
+	}
+	m_hCrateVisual.Set( NULL );
+}
+
+//-----------------------------------------------------------------------------
+void CTFBMCrate::UpdateOnRemove( void )
+{
+	RemoveCrateVisual();
+	BaseClass::UpdateOnRemove();
 }
 
 //-----------------------------------------------------------------------------
@@ -69,12 +139,35 @@ CTFBMCrate *CTFBMCrate::GetCrateAtCell( int iCellX, int iCellY )
 }
 
 //-----------------------------------------------------------------------------
+int CTFBMCrate::CountCrates( void )
+{
+	int nCount = 0;
+	for ( CBaseEntity *pEnt = gEntList.FindEntityByClassname( NULL, "tf_bm_crate" );
+		pEnt != NULL;
+		pEnt = gEntList.FindEntityByClassname( pEnt, "tf_bm_crate" ) )
+	{
+		++nCount;
+	}
+	return nCount;
+}
+
+//-----------------------------------------------------------------------------
 void CTFBMCrate::RemoveAllCrates( void )
 {
-	CBaseEntity *pEnt = NULL;
-	while ( ( pEnt = gEntList.FindEntityByClassname( pEnt, "tf_bm_crate" ) ) != NULL )
+	CUtlVector<CTFBMCrate *> vecCrates;
+	for ( CBaseEntity *pEnt = gEntList.FindEntityByClassname( NULL, "tf_bm_crate" );
+		pEnt != NULL;
+		pEnt = gEntList.FindEntityByClassname( pEnt, "tf_bm_crate" ) )
 	{
-		UTIL_Remove( pEnt );
+		vecCrates.AddToTail( assert_cast<CTFBMCrate *>( pEnt ) );
+	}
+
+	for ( int i = 0; i < vecCrates.Count(); ++i )
+	{
+		if ( vecCrates[i] )
+		{
+			UTIL_Remove( vecCrates[i] );
+		}
 	}
 }
 

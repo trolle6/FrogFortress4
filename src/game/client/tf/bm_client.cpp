@@ -33,11 +33,54 @@ ConVar tf_bm_client_snap( "tf_bm_client_snap", "0", FCVAR_CLIENTDLL | FCVAR_ARCH
 ConVar tf_bm_ffa( "tf_bm_ffa", "1", FCVAR_REPLICATED, "Bomberman: free-for-all (teams cosmetic / join only)." );
 
 // Replicated — defaults must match server (bm_arena.cpp / bm_player_system.cpp).
-ConVar tf_bm_arena_width( "tf_bm_arena_width", "11", FCVAR_REPLICATED, "Bomberman arena width in grid cells (odd, includes border walls)." );
-ConVar tf_bm_arena_height( "tf_bm_arena_height", "35", FCVAR_REPLICATED, "Bomberman arena height in grid cells (odd, includes border walls)." );
+ConVar tf_bm_arena_width( "tf_bm_arena_width", "35", FCVAR_REPLICATED, "Bomberman arena width in grid cells (odd, square on itemtest)." );
+ConVar tf_bm_arena_height( "tf_bm_arena_height", "35", FCVAR_REPLICATED, "Bomberman arena height in grid cells (odd, square on itemtest)." );
+ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "0", FCVAR_REPLICATED, "Bomberman: 1=border + pillar hard walls." );
 ConVar tf_bm_cell_size( "tf_bm_cell_size", "64", FCVAR_REPLICATED, "Bomberman: grid cell size in Hammer units." );
 ConVar tf_bm_grid_origin( "tf_bm_grid_origin", "0 0 0", FCVAR_REPLICATED, "Bomberman: world origin of cell (0,0). Auto-set from team spawns on map load." );
 ConVar tf_bm_play_z_offset( "tf_bm_play_z_offset", "8", FCVAR_REPLICATED, "Bomberman: player feet offset above grid origin Z." );
+
+// Stubs so "exec mode_bomber" from the client console does not spam Unknown command.
+// Server applies the real values via FF post-map setup / bm_fix (listen server).
+ConVar tf_bm_maze_crates( "tf_bm_maze_crates", "1", FCVAR_REPLICATED, "Bomberman: DFS soft-crate maze." );
+ConVar tf_bm_arena_soft_fill( "tf_bm_arena_soft_fill", "0", FCVAR_REPLICATED, "Bomberman: random crate fill." );
+ConVar tf_bm_crate_visible( "tf_bm_crate_visible", "1", FCVAR_REPLICATED, "Bomberman: visible crate props." );
+ConVar tf_bm_crate_collide( "tf_bm_crate_collide", "0", FCVAR_REPLICATED, "Bomberman: crate prop collision (grid only)." );
+ConVar tf_bm_crate_scale( "tf_bm_crate_scale", "0.9", FCVAR_REPLICATED, "Bomberman: crate prop scale." );
+ConVar tf_bm_grid_move( "tf_bm_grid_move", "0", FCVAR_REPLICATED, "Bomberman: grid-step movement." );
+ConVar tf_bm_arena_lock( "tf_bm_arena_lock", "0", FCVAR_REPLICATED, "Bomberman: arena lock." );
+ConVar tf_bm_free_move( "tf_bm_free_move", "1", FCVAR_REPLICATED, "Bomberman: standard letgo (no floor snap)." );
+ConVar tf_bm_move_speed( "tf_bm_move_speed", "400", FCVAR_REPLICATED, "Bomberman: move speed." );
+ConVar tf_bm_bomb_fuse( "tf_bm_bomb_fuse", "2.5", FCVAR_REPLICATED, "Bomberman: bomb fuse." );
+ConVar tf_bm_bomb_range( "tf_bm_bomb_range", "3", FCVAR_REPLICATED, "Bomberman: bomb range." );
+ConVar tf_bm_max_bombs( "tf_bm_max_bombs", "2", FCVAR_REPLICATED, "Bomberman: max bombs." );
+ConVar tf_bm_render_props( "tf_bm_render_props", "1", FCVAR_REPLICATED, "Bomberman: render props." );
+ConVar tf_bm_deck_visible( "tf_bm_deck_visible", "0", FCVAR_REPLICATED, "Bomberman: deck visible." );
+ConVar tf_bm_deck_props( "tf_bm_deck_props", "0", FCVAR_REPLICATED, "Bomberman: deck props." );
+ConVar tf_bm_bomb_visible( "tf_bm_bomb_visible", "1", FCVAR_REPLICATED, "Bomberman: bomb visible." );
+ConVar tf_bm_bomb_scale( "tf_bm_bomb_scale", "0.2", FCVAR_REPLICATED, "Bomberman: bomb scale." );
+ConVar tf_bm_bomb_spin_speed( "tf_bm_bomb_spin_speed", "240", FCVAR_REPLICATED, "Bomberman: bomb spin." );
+ConVar tf_bm_void_arena( "tf_bm_void_arena", "0", FCVAR_REPLICATED, "Bomberman: void arena." );
+ConVar tf_bm_sky_arena( "tf_bm_sky_arena", "0", FCVAR_REPLICATED, "Bomberman: sky arena." );
+ConVar tf_bm_floor_z_override( "tf_bm_floor_z_override", "-135", FCVAR_REPLICATED, "Bomberman: floor Z." );
+ConVar tf_bm_floor_deck( "tf_bm_floor_deck", "1", FCVAR_REPLICATED, "Bomberman: floor deck." );
+ConVar tf_bm_floor_drop( "tf_bm_floor_drop", "288", FCVAR_REPLICATED, "Bomberman: floor drop." );
+ConVar tf_bm_room_min_x( "tf_bm_room_min_x", "1304", FCVAR_REPLICATED, "itemtest room min X." );
+ConVar tf_bm_room_min_y( "tf_bm_room_min_y", "-2536", FCVAR_REPLICATED, "itemtest room min Y." );
+ConVar tf_bm_room_max_x( "tf_bm_room_max_x", "2024", FCVAR_REPLICATED, "itemtest room max X." );
+ConVar tf_bm_room_max_y( "tf_bm_room_max_y", "-280", FCVAR_REPLICATED, "itemtest room max Y." );
+//-----------------------------------------------------------------------------
+// Listen server: forward bm_fix from client console to server.
+//-----------------------------------------------------------------------------
+static void CC_BM_ClientFix( const CCommand &args )
+{
+	if ( engine )
+	{
+		engine->ServerCmd( "bm_fix\n" );
+	}
+}
+
+static ConCommand bm_fix( "bm_fix", CC_BM_ClientFix, "Rebuild blowable wall maze (server).", FCVAR_CLIENTDLL );
 
 static QAngle s_angBMLockedView( 90.0f, 90.0f, 0.0f );
 static int s_nBMClipPushDepth = 0;
@@ -200,6 +243,11 @@ static int BM_ClientGetSpawnSlot( C_TFPlayer *pLocalPlayer )
 		}
 	}
 
+	if ( tf_bm_ffa.GetBool() )
+	{
+		return clamp( iSlot, 0, BM_MAX_FFA_PLAYERS - 1 );
+	}
+
 	return clamp( iSlot, 0, BM_MAX_SPAWN_SLOTS_PER_TEAM - 1 );
 }
 
@@ -220,7 +268,7 @@ static void BM_ClientGetSpawnCell( C_TFPlayer *pLocalPlayer, int &iCellX, int &i
 	const int iSlot = BM_ClientGetSpawnSlot( pLocalPlayer );
 	if ( tf_bm_ffa.GetBool() )
 	{
-		BM_GetSpawnCellForCorner( iSlot % 4, iSlot, iWidth, iHeight, iCellX, iCellY );
+		BM_GetSpawnCellForPlayer( iSlot, iWidth, iHeight, iCellX, iCellY );
 	}
 	else
 	{
@@ -811,13 +859,16 @@ static void BM_ClientDrawGridOverlay( void )
 		const float y1 = vecGridOrigin.y + iHeight * flCell;
 		BM_ClientDrawCellOutline( x0, y0, x1, y1, flZ, 220, 80, 60 );
 
-		for ( int iCellX = 2; iCellX < iWidth - 1; iCellX += 2 )
+		if ( tf_bm_hard_walls.GetBool() )
 		{
-			for ( int iCellY = 2; iCellY < iHeight - 1; iCellY += 2 )
+			for ( int iCellX = 2; iCellX < iWidth - 1; iCellX += 2 )
 			{
-				const float px0 = vecGridOrigin.x + iCellX * flCell;
-				const float py0 = vecGridOrigin.y + iCellY * flCell;
-				BM_ClientDrawCellOutline( px0, py0, px0 + flCell, py0 + flCell, flZ, 140, 140, 200 );
+				for ( int iCellY = 2; iCellY < iHeight - 1; iCellY += 2 )
+				{
+					const float px0 = vecGridOrigin.x + iCellX * flCell;
+					const float py0 = vecGridOrigin.y + iCellY * flCell;
+					BM_ClientDrawCellOutline( px0, py0, px0 + flCell, py0 + flCell, flZ, 140, 140, 200 );
+				}
 			}
 		}
 		return;
@@ -833,7 +884,7 @@ static void BM_ClientDrawGridOverlay( void )
 			const float y1 = y0 + flCell;
 
 			const bool bBorder = ( iCellX == 0 || iCellY == 0 || iCellX == iWidth - 1 || iCellY == iHeight - 1 );
-			const bool bPillar = ( !bBorder && ( iCellX % 2 ) == 0 && ( iCellY % 2 ) == 0 );
+			const bool bPillar = tf_bm_hard_walls.GetBool() && ( !bBorder && ( iCellX % 2 ) == 0 && ( iCellY % 2 ) == 0 );
 			const int r = bBorder ? 220 : ( bPillar ? 140 : 80 );
 			const int g = bBorder ? 80 : ( bPillar ? 140 : 200 );
 			const int bCol = bBorder ? 60 : ( bPillar ? 200 : 255 );

@@ -21,6 +21,8 @@ bool BM_UseGridMovement( CTFPlayer *pPlayer );
 void BM_ApplySkyPlayMovement( CTFPlayer *pPlayer );
 bool BM_IsPlayerMovementUnlocked( CTFPlayer *pPlayer );
 void BM_SetPlayerMovementUnlocked( CTFPlayer *pPlayer, bool bUnlocked );
+void BM_ApplyDefaultFreeMove( CTFPlayer *pPlayer );
+void BM_ReleaseAllPlayersForFreeMove( void );
 bool BM_IsFreeForAll( void );
 int BM_GetPlayerSpawnSlot( CTFPlayer *pPlayer );
 void BM_EnsurePlayerJoinedMatch( CTFPlayer *pPlayer );

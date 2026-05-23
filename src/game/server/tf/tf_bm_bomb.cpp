@@ -21,22 +21,22 @@ LINK_ENTITY_TO_CLASS( tf_bm_bomb, CTFBMBomb );
 
 #define BM_BOMB_STATUE_MODEL "models/soldier_statue/soldier_statue.mdl"
 
-static const char *const g_BMBombModels[] = {
-	BM_BOMB_STATUE_MODEL,
+static const char *const g_BMBombFallbackModels[] = {
 	"models/props_gameplay/orange_cone001.mdl",
 	"models/props_halloween/pumpkin_loot.mdl",
 	"models/props_farm/wooden_barrel.mdl",
-	"models/props_c17/oildrum001.mdl",
 };
 
 ConVar tf_bm_bomb_fuse( "tf_bm_bomb_fuse", "2.5", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: seconds until a placed bomb explodes." );
 ConVar tf_bm_bomb_range( "tf_bm_bomb_range", "2", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: blast length in grid cells (each arm, not counting center)." );
-ConVar tf_bm_max_bombs( "tf_bm_max_bombs", "1", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: max active bombs per player." );
+ConVar tf_bm_max_bombs( "tf_bm_max_bombs", "2", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: max active bombs per player." );
 ConVar tf_bm_bomb_damage( "tf_bm_bomb_damage", "500", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: blast damage to players." );
 ConVar tf_bm_bomb_visible( "tf_bm_bomb_visible", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Bomberman: spawn a networked prop_dynamic at each bomb (visible on clients)." );
-ConVar tf_bm_bomb_scale( "tf_bm_bomb_scale", "0.18", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Bomberman: scale for bomb prop (soldier statue default; ~0.18 fits a 64u cell)." );
+	"Bomberman: spawn a networked prop_dynamic mini soldier statue at each bomb." );
+ConVar tf_bm_bomb_scale( "tf_bm_bomb_scale", "0.2", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Bomberman: scale for bomb statue (~0.2 fits a 64u cell)." );
+ConVar tf_bm_bomb_spin_speed( "tf_bm_bomb_spin_speed", "240", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Bomberman: statue spin speed (degrees/sec) while fuse runs." );
 
 //-----------------------------------------------------------------------------
 static float BM_GetBombVisualBaseScale( void )
@@ -45,10 +45,24 @@ static float BM_GetBombVisualBaseScale( void )
 }
 
 //-----------------------------------------------------------------------------
+static const char *BM_ResolveBombModel( void )
+{
+	CBaseEntity::PrecacheModel( BM_BOMB_STATUE_MODEL, false );
+	if ( modelinfo->GetModelIndex( BM_BOMB_STATUE_MODEL ) > 0 )
+	{
+		return BM_BOMB_STATUE_MODEL;
+	}
+
+	BM_PrecacheModelCandidates( g_BMBombFallbackModels, ARRAYSIZE( g_BMBombFallbackModels ) );
+	return BM_SelectModel( g_BMBombFallbackModels, ARRAYSIZE( g_BMBombFallbackModels ) );
+}
+
+//-----------------------------------------------------------------------------
 CTFBMBomb::CTFBMBomb()
 {
 	m_iCellX = 0;
 	m_iCellY = 0;
+	m_flPlaceTime = 0.0f;
 	m_flDetonateTime = 0.0f;
 	m_iBlastRange = 2;
 	m_bDetonating = false;
@@ -58,7 +72,8 @@ CTFBMBomb::CTFBMBomb()
 //-----------------------------------------------------------------------------
 void CTFBMBomb::Precache( void )
 {
-	BM_PrecacheModelCandidates( g_BMBombModels, ARRAYSIZE( g_BMBombModels ) );
+	CBaseEntity::PrecacheModel( BM_BOMB_STATUE_MODEL, false );
+	BM_PrecacheModelCandidates( g_BMBombFallbackModels, ARRAYSIZE( g_BMBombFallbackModels ) );
 	PrecacheScriptSound( "Weapon_Grenade.Tick" );
 	PrecacheScriptSound( "BaseGrenade.Explode" );
 
@@ -70,18 +85,19 @@ void CTFBMBomb::Spawn( void )
 {
 	Precache();
 
-	BM_ApplyPropModelOrHidden( assert_cast<CBaseAnimating *>( this ), g_BMBombModels, ARRAYSIZE( g_BMBombModels ), 1.0f );
 	SetSolid( SOLID_NONE );
 	SetMoveType( MOVETYPE_NONE );
-	AddEffects( EF_NOSHADOW );
+	AddEffects( EF_NOSHADOW | EF_NODRAW );
 	SetCollisionGroup( COLLISION_GROUP_DEBRIS );
 
 	BaseClass::Spawn();
 
 	SpawnBombVisual();
 
+	m_flPlaceTime = gpGlobals->curtime;
+
 	SetThink( &CTFBMBomb::BombThink );
-	SetNextThink( gpGlobals->curtime + 0.1f );
+	SetNextThink( gpGlobals->curtime + 0.05f );
 }
 
 //-----------------------------------------------------------------------------
@@ -94,10 +110,10 @@ void CTFBMBomb::SpawnBombVisual( void )
 		return;
 	}
 
-	BM_PrecacheModelCandidates( g_BMBombModels, ARRAYSIZE( g_BMBombModels ) );
-	const char *pszModel = BM_SelectModel( g_BMBombModels, ARRAYSIZE( g_BMBombModels ) );
+	const char *pszModel = BM_ResolveBombModel();
 	if ( !pszModel )
 	{
+		Warning( "BM bomb: no model (statue missing — mount TF2 VPKs).\n" );
 		return;
 	}
 
@@ -108,21 +124,30 @@ void CTFBMBomb::SpawnBombVisual( void )
 	}
 
 	const float flBaseScale = BM_GetBombVisualBaseScale();
+	const bool bStatue = ( Q_stristr( pszModel, "soldier_statue" ) != NULL );
+
+	Vector vecOrigin = GetAbsOrigin();
+	if ( bStatue )
+	{
+		vecOrigin.z -= BM_GetCellSize() * 0.1f * flBaseScale;
+	}
 
 	pProp->SetModel( pszModel );
-	Vector vecOrigin = GetAbsOrigin();
-	// Statue origin is at feet; nudge down so the mini statue sits on the grid plane.
-	if ( pszModel && Q_stristr( pszModel, "soldier_statue" ) != NULL )
-	{
-		vecOrigin.z -= BM_GetCellSize() * 0.12f * flBaseScale;
-		pProp->SetSequence( 0 );
-	}
 	pProp->SetAbsOrigin( vecOrigin );
 	pProp->SetAbsAngles( vec3_angle );
 	pProp->SetModelScale( flBaseScale );
 	pProp->SetSolid( SOLID_NONE );
 	pProp->SetMoveType( MOVETYPE_NONE );
-	pProp->Spawn();
+	pProp->AddEffects( EF_NOSHADOW );
+	pProp->RemoveEffects( EF_NODRAW );
+
+	if ( bStatue )
+	{
+		pProp->SetSequence( 0 );
+		pProp->SetPlaybackRate( 0.0f );
+	}
+
+	DispatchSpawn( pProp );
 	pProp->Activate();
 
 	m_hBombVisual.Set( pProp );
@@ -154,17 +179,20 @@ void CTFBMBomb::BombThink( void )
 		return;
 	}
 
-	const float flPulse = 0.85f + 0.15f * sinf( gpGlobals->curtime * 8.0f );
-	SetModelScale( flPulse, 0.0f );
-
 	const float flBaseScale = BM_GetBombVisualBaseScale();
 	CBaseAnimating *pVisual = dynamic_cast<CBaseAnimating *>( m_hBombVisual.Get() );
 	if ( pVisual )
 	{
-		pVisual->SetModelScale( flBaseScale * flPulse, 0.0f );
+		pVisual->SetModelScale( flBaseScale, 0.0f );
+
+		const float flSpin = tf_bm_bomb_spin_speed.GetFloat();
+		const float flYaw = fmodf( ( gpGlobals->curtime - m_flPlaceTime ) * flSpin, 360.0f );
+		const QAngle angSpin( 0.0f, flYaw, 0.0f );
+		pVisual->SetAbsAngles( angSpin );
+		pVisual->SetLocalAngles( angSpin );
 	}
 
-	SetNextThink( gpGlobals->curtime + 0.1f );
+	SetNextThink( gpGlobals->curtime + 0.05f );
 }
 
 //-----------------------------------------------------------------------------
@@ -199,6 +227,7 @@ CTFBMBomb *CTFBMBomb::PlaceAtCell( CTFPlayer *pOwner, int iCellX, int iCellY )
 	pBomb->m_iCellY = iCellY;
 	pBomb->m_hOwnerPlayer = pOwner;
 	pBomb->m_iBlastRange = clamp( tf_bm_bomb_range.GetInt(), 1, 8 );
+	pBomb->m_flPlaceTime = gpGlobals->curtime;
 	pBomb->m_flDetonateTime = gpGlobals->curtime + Max( 0.5f, tf_bm_bomb_fuse.GetFloat() );
 
 	pBomb->SetAbsOrigin( vecCenter );
@@ -210,6 +239,10 @@ CTFBMBomb *CTFBMBomb::PlaceAtCell( CTFPlayer *pOwner, int iCellX, int iCellY )
 	pOwner->m_iBMActiveBombs++;
 
 	pBomb->EmitSound( "Weapon_Grenade.Tick" );
+
+	Msg( "BM bomb: %s placed at cell %d,%d (statue visual %s)\n",
+		pOwner->GetPlayerName(), iCellX, iCellY,
+		pBomb->m_hBombVisual.Get() ? "yes" : "no" );
 
 	return pBomb;
 }
@@ -233,12 +266,12 @@ static void BM_HurtPlayersAtCell( int iCellX, int iCellY, CTFPlayer *pOwner, CTF
 
 		Vector vecDelta = pPlayer->GetAbsOrigin() - vecCenter;
 		vecDelta.z = 0.0f;
-		if ( vecDelta.LengthSqr() > flRadius * flRadius )
+		if ( vecDelta.Length() > flRadius )
 		{
 			continue;
 		}
 
-		if ( pOwner && pPlayer == pOwner )
+		if ( BM_IsFreeForAll() && pOwner && pPlayer == pOwner )
 		{
 			continue;
 		}

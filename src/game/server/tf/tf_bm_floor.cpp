@@ -4,6 +4,7 @@
 #ifdef SOURCESDK
 
 #include "tf_bm_floor.h"
+#include "bm_arena.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -51,6 +52,12 @@ CTFBMFloor *CTFBMFloor::CreateForArena( const Vector &vecCenter, float flWidth, 
 
 	DispatchSpawn( pFloor );
 	pFloor->Activate();
+
+	extern bool BM_IsMapFloorArena( void );
+	if ( BM_IsMapFloorArena() )
+	{
+		pFloor->SetSolid( SOLID_NONE );
+	}
 
 	return pFloor;
 }
