@@ -25,7 +25,7 @@ ConVar tf_bm_room_square( "tf_bm_room_square", "0", FCVAR_REPLICATED | FCVAR_NOT
 ConVar tf_bm_arena_soft_fill( "tf_bm_arena_soft_fill", "0.0", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Bomberman: random crate fill (0 when tf_bm_maze_crates 1)." );
 ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Bomberman: 1=indestructible border + pillar walls (classic). 0=soft crate maze only." );
+	"Bomberman: 1=indestructible interior pillar islands (no outer ring). 0=soft crate maze only." );
 ConVar tf_bm_maze_crates( "tf_bm_maze_crates", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Bomberman: 1=DFS maze with blowable wood crates between hard walls. 0=random soft_fill." );
 ConVar tf_bm_arena_lift( "tf_bm_arena_lift", "0", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: legacy relative lift above spawns." );
@@ -383,12 +383,9 @@ bool BM_IsHardWallCell( int iCellX, int iCellY )
 		return false;
 	}
 
-	if ( iCellX == 0 || iCellY == 0 || iCellX == s_iArenaWidth - 1 || iCellY == s_iArenaHeight - 1 )
-	{
-		return true;
-	}
-
-	if ( ( iCellX % 2 ) == 0 && ( iCellY % 2 ) == 0 )
+	// Interior pillar lattice only — no perimeter ring of hard props.
+	if ( iCellX > 0 && iCellY > 0 && iCellX < s_iArenaWidth - 1 && iCellY < s_iArenaHeight - 1
+		&& ( iCellX % 2 ) == 0 && ( iCellY % 2 ) == 0 )
 	{
 		return true;
 	}
@@ -1503,9 +1500,14 @@ void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild )
 		const char *pszMap = STRING( gpGlobals->mapname );
 		if ( pszMap && Q_stricmp( pszMap, "itemtest" ) == 0 )
 		{
-			if ( bHardWalls && bMazeCrates && nWalls > 0 )
+			if ( bHardWalls && !bMazeCrates && nWalls > 0 )
 			{
-				UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d classic maze — %d hard walls, %d wood crates (MOUSE1 blasts crates).",
+				UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d pillar islands — %d hard stacks, open floor (soft fill later).",
+					s_iArenaWidth, s_iArenaHeight, nWalls ) );
+			}
+			else if ( bHardWalls && bMazeCrates && nWalls > 0 )
+			{
+				UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d classic maze — %d hard pillars, %d wood crates (MOUSE1 blasts crates).",
 					s_iArenaWidth, s_iArenaHeight, nWalls, nCrates ) );
 			}
 			else if ( bMazeCrates && nCrates > 0 )

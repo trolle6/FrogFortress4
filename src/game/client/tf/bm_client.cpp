@@ -35,17 +35,17 @@ ConVar tf_bm_ffa( "tf_bm_ffa", "1", FCVAR_REPLICATED, "Bomberman: free-for-all (
 // Replicated — defaults must match server (bm_arena.cpp / bm_player_system.cpp).
 ConVar tf_bm_arena_width( "tf_bm_arena_width", "35", FCVAR_REPLICATED, "Bomberman arena width in grid cells (odd, square on itemtest)." );
 ConVar tf_bm_arena_height( "tf_bm_arena_height", "35", FCVAR_REPLICATED, "Bomberman arena height in grid cells (odd, square on itemtest)." );
-ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "1", FCVAR_REPLICATED, "Bomberman: 1=border + pillar hard walls." );
+ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "1", FCVAR_REPLICATED, "Bomberman: 1=interior pillar islands (no border ring)." );
 ConVar tf_bm_wall_visible( "tf_bm_wall_visible", "1", FCVAR_REPLICATED, "Bomberman: visible hard-wall props." );
 ConVar tf_bm_wall_scale( "tf_bm_wall_scale", "1.05", FCVAR_REPLICATED, "Bomberman: hard-wall prop scale." );
 ConVar tf_bm_wall_stack( "tf_bm_wall_stack", "2", FCVAR_REPLICATED, "Bomberman: stacked layers per hard wall." );
-ConVar tf_bm_cell_size( "tf_bm_cell_size", "64", FCVAR_REPLICATED, "Bomberman: grid cell size in Hammer units." );
+ConVar tf_bm_cell_size( "tf_bm_cell_size", "48", FCVAR_REPLICATED, "Bomberman: grid cell size in Hammer units." );
 ConVar tf_bm_grid_origin( "tf_bm_grid_origin", "0 0 0", FCVAR_REPLICATED, "Bomberman: world origin of cell (0,0). Auto-set from team spawns on map load." );
 ConVar tf_bm_play_z_offset( "tf_bm_play_z_offset", "8", FCVAR_REPLICATED, "Bomberman: player feet offset above grid origin Z." );
 
 // Stubs so "exec mode_bomber" from the client console does not spam Unknown command.
 // Server applies the real values via FF post-map setup / bm_fix (listen server).
-ConVar tf_bm_maze_crates( "tf_bm_maze_crates", "1", FCVAR_REPLICATED, "Bomberman: DFS soft-crate maze." );
+ConVar tf_bm_maze_crates( "tf_bm_maze_crates", "0", FCVAR_REPLICATED, "Bomberman: DFS soft-crate maze." );
 ConVar tf_bm_arena_soft_fill( "tf_bm_arena_soft_fill", "0", FCVAR_REPLICATED, "Bomberman: random crate fill." );
 ConVar tf_bm_crate_visible( "tf_bm_crate_visible", "1", FCVAR_REPLICATED, "Bomberman: visible crate props." );
 ConVar tf_bm_crate_collide( "tf_bm_crate_collide", "0", FCVAR_REPLICATED, "Bomberman: crate prop collision (grid only)." );

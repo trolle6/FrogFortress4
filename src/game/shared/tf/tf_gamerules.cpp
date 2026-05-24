@@ -916,7 +916,7 @@ ConVar tf_ff_game_mode( "tf_ff_game_mode", "3", FCVAR_REPLICATED | FCVAR_NOTIFY,
 #endif
 );
 ConVar tf_bm_respawn_time( "tf_bm_respawn_time", "2", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: respawn delay after dying to a blast." );
-ConVar tf_bm_build_id( "tf_bm_build_id", "bomber-classic-maze", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman build tag (confirms DLL build)." );
+ConVar tf_bm_build_id( "tf_bm_build_id", "bomber-pillar-islands", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman build tag (confirms DLL build)." );
 ConVar tf_rim_mode( "tf_rim_mode", "0", FCVAR_REPLICATED | FCVAR_NOTIFY, "Rainbow Is Magic: archived hostage mode (0=off). Prefer tf_ff_game_mode or ff_mode."
 #ifdef GAME_DLL
 	, TfRimModeChanged

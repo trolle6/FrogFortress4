@@ -13,7 +13,7 @@ Everything (grid, crates, spawns, floor) uses **`tf_bm_room_*`** — the basemen
 | SW | 2024 | -2536 |
 | SE | 1304 | -2536 |
 
-- **`tf_bm_room_square 0`** (default): maze fills the **rectangle** inside that box (~11×33 cells @ 64).
+- **`tf_bm_room_square 0`** (default): maze fills the **rectangle** inside that box (~15×47 cells @ 48).
 - **`tf_bm_room_square 1`**: **inscribed square** maze (same size as the *shorter* side), centered in the room — still **never** grows outside the box.
 
 Crates are only placed if the cell is inside the Hammer box **and** brush traces say the floor is valid (no props in vanilla rooms or inside walls).
@@ -24,7 +24,7 @@ Crates are only placed if the cell is inside the Hammer box **and** brush traces
 ff_play bomber
 ```
 
-Join RED/BLU Scout, MOUSE1 = bomb. Confirm DLL: `tf_bm_build_id` = **`bomber-classic-maze`**. Default maze: **hard stacked walls** (cannot blow up) + **wood crates** (MOUSE1). Movement: **`tf_bm_free_move 1`**. Empty maze: **`bm_fix`**.
+Join RED/BLU Scout, MOUSE1 = bomb. Confirm DLL: `tf_bm_build_id` = **`bomber-pillar-islands`**. Default: **interior pillar stacks only** (no outer ring), open corridors. **Soft blowable fill** everywhere except spawns is planned next. Movement: **`tf_bm_free_move 1`**. Empty maze: **`bm_fix`**.
 
 ## Architecture (no more “expand square over the map”)
 
@@ -32,7 +32,7 @@ Join RED/BLU Scout, MOUSE1 = bomb. Confirm DLL: `tf_bm_build_id` = **`bomber-cla
 |-------|------|
 | Hammer room | `tf_bm_room_min_*` / `max_*` from your corners |
 | Play volume | Grid sized to fit **inside** that room only |
-| Maze | DFS corridors; **hard walls** on border + pillars; **soft crates** fill other cells |
+| Maze | **Pillar islands** on interior lattice (`tf_bm_hard_walls 1`); no border ring; soft fill later |
 | Spawn | Corners of **Hammer room**, not grid index (1,33) in the void |
 | Spawn spot | `GetPlayerSpawnSpot` → `BM_PlacePlayerAtArenaSpawn` only |
 
