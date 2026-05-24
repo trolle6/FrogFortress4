@@ -35,7 +35,10 @@ ConVar tf_bm_ffa( "tf_bm_ffa", "1", FCVAR_REPLICATED, "Bomberman: free-for-all (
 // Replicated — defaults must match server (bm_arena.cpp / bm_player_system.cpp).
 ConVar tf_bm_arena_width( "tf_bm_arena_width", "35", FCVAR_REPLICATED, "Bomberman arena width in grid cells (odd, square on itemtest)." );
 ConVar tf_bm_arena_height( "tf_bm_arena_height", "35", FCVAR_REPLICATED, "Bomberman arena height in grid cells (odd, square on itemtest)." );
-ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "0", FCVAR_REPLICATED, "Bomberman: 1=border + pillar hard walls." );
+ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "1", FCVAR_REPLICATED, "Bomberman: 1=border + pillar hard walls." );
+ConVar tf_bm_wall_visible( "tf_bm_wall_visible", "1", FCVAR_REPLICATED, "Bomberman: visible hard-wall props." );
+ConVar tf_bm_wall_scale( "tf_bm_wall_scale", "1.05", FCVAR_REPLICATED, "Bomberman: hard-wall prop scale." );
+ConVar tf_bm_wall_stack( "tf_bm_wall_stack", "2", FCVAR_REPLICATED, "Bomberman: stacked layers per hard wall." );
 ConVar tf_bm_cell_size( "tf_bm_cell_size", "64", FCVAR_REPLICATED, "Bomberman: grid cell size in Hammer units." );
 ConVar tf_bm_grid_origin( "tf_bm_grid_origin", "0 0 0", FCVAR_REPLICATED, "Bomberman: world origin of cell (0,0). Auto-set from team spawns on map load." );
 ConVar tf_bm_play_z_offset( "tf_bm_play_z_offset", "8", FCVAR_REPLICATED, "Bomberman: player feet offset above grid origin Z." );

@@ -7,6 +7,7 @@
 #include "bm_grid.h"
 #include "bm_player_system.h"
 #include "bm_shareddefs.h"
+#include "tf_bm_bomb.h"
 #include "tf_bm_crate.h"
 #include "tf_bm_wall.h"
 #include "tf_bm_floor.h"
@@ -23,10 +24,10 @@ ConVar tf_bm_room_square( "tf_bm_room_square", "0", FCVAR_REPLICATED | FCVAR_NOT
 	"itemtest: 0=use full Hammer room rectangle. 1=inscribed square maze (fits inside room, never expands into map)." );
 ConVar tf_bm_arena_soft_fill( "tf_bm_arena_soft_fill", "0.0", FCVAR_REPLICATED | FCVAR_NOTIFY,
 	"Bomberman: random crate fill (0 when tf_bm_maze_crates 1)." );
-ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "0", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Bomberman: 1=border + pillar hard walls. 0=soft crate maze only (walk through grid)." );
+ConVar tf_bm_hard_walls( "tf_bm_hard_walls", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
+	"Bomberman: 1=indestructible border + pillar walls (classic). 0=soft crate maze only." );
 ConVar tf_bm_maze_crates( "tf_bm_maze_crates", "1", FCVAR_REPLICATED | FCVAR_NOTIFY,
-	"Bomberman: 1=DFS maze of destructible crates. 0=random soft_fill." );
+	"Bomberman: 1=DFS maze with blowable wood crates between hard walls. 0=random soft_fill." );
 ConVar tf_bm_arena_lift( "tf_bm_arena_lift", "0", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: legacy relative lift above spawns." );
 ConVar tf_bm_arena_offset( "tf_bm_arena_offset", "2048 2048", FCVAR_REPLICATED | FCVAR_NOTIFY, "Bomberman: XY offset from map spawns for floating arena (stock maps)." );
 ConVar tf_bm_void_arena( "tf_bm_void_arena", "0", FCVAR_REPLICATED | FCVAR_NOTIFY,
@@ -353,6 +354,12 @@ bool BM_IsArenaActive( void )
 }
 
 //-----------------------------------------------------------------------------
+bool BM_IsArenaGameplayReady( void )
+{
+	return s_bArenaActive && s_bBMPostMapArenaReady;
+}
+
+//-----------------------------------------------------------------------------
 bool BM_IsInsideArenaCell( int iCellX, int iCellY )
 {
 	if ( !s_bArenaActive )
@@ -496,7 +503,7 @@ static bool BM_MazeCellIsPassage( int iCellX, int iCellY )
 	return s_bMazePassage[iCellX][iCellY];
 }
 
-// Thin-wall maze: crates on border + odd pillar cells only (open corridors between).
+// Classic Bomberman: soft crates fill carved maze cells that are not hard pillars.
 static bool BM_MazeCellGetsCrate( int iCellX, int iCellY )
 {
 	if ( BM_MazeCellIsPassage( iCellX, iCellY ) )
@@ -504,12 +511,17 @@ static bool BM_MazeCellGetsCrate( int iCellX, int iCellY )
 		return false;
 	}
 
-	if ( iCellX == 0 || iCellY == 0 || iCellX == s_iArenaWidth - 1 || iCellY == s_iArenaHeight - 1 )
+	if ( BM_IsHardWallCell( iCellX, iCellY ) )
 	{
-		return true;
+		return false;
 	}
 
-	return ( ( iCellX % 2 ) == 1 && ( iCellY % 2 ) == 1 );
+	if ( BM_IsFFAPlayerSpawnCell( iCellX, iCellY ) || BM_IsNearSpawnCell( iCellX, iCellY ) )
+	{
+		return false;
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -732,7 +744,12 @@ static bool BM_IsArenaConfigValid( void )
 		}
 	}
 
-	if ( BM_IsMapFloorArena() && !tf_bm_hard_walls.GetBool() && tf_bm_maze_crates.GetBool() && CTFBMCrate::CountCrates() <= 0 )
+	if ( BM_IsMapFloorArena() && tf_bm_hard_walls.GetBool() && CTFBMWall::CountWalls() <= 0 )
+	{
+		return false;
+	}
+
+	if ( BM_IsMapFloorArena() && tf_bm_maze_crates.GetBool() && !tf_bm_hard_walls.GetBool() && CTFBMCrate::CountCrates() <= 0 )
 	{
 		return false;
 	}
@@ -760,7 +777,9 @@ bool BM_EnsureArenaBuilt( void )
 
 	BM_BuildArena( false, false );
 
-	if ( BM_IsMapFloorArena() && !tf_bm_hard_walls.GetBool() && CTFBMCrate::CountCrates() <= 0 )
+	if ( BM_IsMapFloorArena()
+		&& ( ( tf_bm_hard_walls.GetBool() && CTFBMWall::CountWalls() <= 0 )
+			|| ( tf_bm_maze_crates.GetBool() && !tf_bm_hard_walls.GetBool() && CTFBMCrate::CountCrates() <= 0 ) ) )
 	{
 		BM_BuildArena( false, true );
 	}
@@ -1297,11 +1316,21 @@ void BM_RemoveAllBombs( void )
 		}
 	}
 
+	CUtlVector<EHANDLE> hBombs;
 	for ( CBaseEntity *pEnt = gEntList.FindEntityByClassname( NULL, "tf_bm_bomb" );
 		pEnt != NULL;
 		pEnt = gEntList.FindEntityByClassname( pEnt, "tf_bm_bomb" ) )
 	{
-		UTIL_Remove( pEnt );
+		hBombs.AddToTail( pEnt );
+	}
+
+	for ( int i = 0; i < hBombs.Count(); ++i )
+	{
+		CTFBMBomb *pBomb = dynamic_cast<CTFBMBomb *>( hBombs[i].Get() );
+		if ( pBomb )
+		{
+			UTIL_Remove( pBomb );
+		}
 	}
 }
 
@@ -1366,8 +1395,8 @@ void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild )
 
 	const float flCell = BM_GetCellSize();
 	const float flFill = clamp( tf_bm_arena_soft_fill.GetFloat(), 0.0f, 1.0f );
-	// Soft blowable maze (wood crates). Hard pillars/border only when tf_bm_hard_walls 1.
-	const bool bMazeCrates = ( tf_bm_maze_crates.GetBool() && !tf_bm_hard_walls.GetBool() );
+	const bool bHardWalls = tf_bm_hard_walls.GetBool();
+	const bool bMazeCrates = tf_bm_maze_crates.GetBool();
 
 	Vector vecCenter;
 	Vector vecGridOrigin;
@@ -1388,6 +1417,7 @@ void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild )
 	BM_MarkGridAligned();
 	s_bArenaActive = true;
 
+	// DFS corridors when blowable fill is used (classic hard pillars + soft crates, or soft-only maze).
 	if ( bMazeCrates )
 	{
 		BM_BuildMazePassages( s_iArenaWidth, s_iArenaHeight );
@@ -1449,7 +1479,7 @@ void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild )
 	BM_SpawnArenaVisuals( vecArenaCenter, flArenaW, flArenaD, flPlayZ );
 
 	Msg( "BM arena: %dx%d at %s — %d hard walls, %d soft crates (maze=%d hard=%d sky=%d).\n",
-		s_iArenaWidth, s_iArenaHeight, szOrigin, nWalls, nCrates, bMazeCrates ? 1 : 0, tf_bm_hard_walls.GetInt(), tf_bm_sky_arena.GetInt() );
+		s_iArenaWidth, s_iArenaHeight, szOrigin, nWalls, nCrates, bMazeCrates ? 1 : 0, bHardWalls ? 1 : 0, tf_bm_sky_arena.GetInt() );
 	if ( tf_bm_sky_arena.GetBool() )
 	{
 		UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d sky layer (Z=%.0f) — legacy mode.", s_iArenaWidth, s_iArenaHeight, vecGridOrigin.z ) );
@@ -1473,14 +1503,19 @@ void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild )
 		const char *pszMap = STRING( gpGlobals->mapname );
 		if ( pszMap && Q_stricmp( pszMap, "itemtest" ) == 0 )
 		{
-			if ( bMazeCrates && nCrates > 0 )
+			if ( bHardWalls && bMazeCrates && nWalls > 0 )
 			{
-				UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d maze in Hammer room — %d blowable walls (MOUSE1).",
+				UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d classic maze — %d hard walls, %d wood crates (MOUSE1 blasts crates).",
+					s_iArenaWidth, s_iArenaHeight, nWalls, nCrates ) );
+			}
+			else if ( bMazeCrates && nCrates > 0 )
+			{
+				UTIL_ClientPrintAll( HUD_PRINTTALK, CFmtStr( "Frog Bomber: %dx%d maze — %d blowable crates (MOUSE1).",
 					s_iArenaWidth, s_iArenaHeight, nCrates ) );
 			}
-			else if ( bMazeCrates )
+			else if ( bMazeCrates || bHardWalls )
 			{
-				UTIL_ClientPrintAll( HUD_PRINTTALK, "Frog Bomber: soft walls failed to spawn — restart game after rebuilding server.dll." );
+				UTIL_ClientPrintAll( HUD_PRINTTALK, "Frog Bomber: maze props failed — run bm_fix after rebuilding server.dll." );
 			}
 			else
 			{

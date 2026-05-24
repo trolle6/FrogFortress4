@@ -13,7 +13,9 @@ public:
 
 	virtual void Spawn( void );
 	virtual void Precache( void );
+	virtual void UpdateOnRemove( void );
 	void BombThink( void );
+	void InitFuseFromCurrentTime( void );
 
 	static CTFBMBomb *PlaceAtCell( CTFPlayer *pOwner, int iCellX, int iCellY );
 	static CTFBMBomb *GetBombAtCell( int iCellX, int iCellY );

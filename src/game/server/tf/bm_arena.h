@@ -5,6 +5,7 @@
 #ifdef SOURCESDK
 
 bool BM_IsArenaActive( void );
+bool BM_IsArenaGameplayReady( void );
 bool BM_IsBomberGameplayActive( void );
 // True when this player must use BM_PlacePlayerAtArenaSpawn (never map teamspawns).
 bool BM_PlayerUsesArenaGridSpawn( CTFPlayer *pPlayer );

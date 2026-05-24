@@ -24,7 +24,7 @@ Crates are only placed if the cell is inside the Hammer box **and** brush traces
 ff_play bomber
 ```
 
-Join RED/BLU Scout, MOUSE1 = bomb. Confirm DLL: `tf_bm_build_id` = **`bomber-free-move`**. Movement defaults to **letgo** (`tf_bm_free_move 1` — no floor bounce). Use **`bm_lock`** when you want grid clamp. Empty maze: **`bm_fix`**.
+Join RED/BLU Scout, MOUSE1 = bomb. Confirm DLL: `tf_bm_build_id` = **`bomber-classic-maze`**. Default maze: **hard stacked walls** (cannot blow up) + **wood crates** (MOUSE1). Movement: **`tf_bm_free_move 1`**. Empty maze: **`bm_fix`**.
 
 ## Architecture (no more “expand square over the map”)
 
@@ -32,7 +32,7 @@ Join RED/BLU Scout, MOUSE1 = bomb. Confirm DLL: `tf_bm_build_id` = **`bomber-fre
 |-------|------|
 | Hammer room | `tf_bm_room_min_*` / `max_*` from your corners |
 | Play volume | Grid sized to fit **inside** that room only |
-| Maze | DFS on grid; crates on pillar/border cells that pass validation |
+| Maze | DFS corridors; **hard walls** on border + pillars; **soft crates** fill other cells |
 | Spawn | Corners of **Hammer room**, not grid index (1,33) in the void |
 | Spawn spot | `GetPlayerSpawnSpot` → `BM_PlacePlayerAtArenaSpawn` only |
 

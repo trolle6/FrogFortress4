@@ -10,7 +10,10 @@
 #include "tf_bm_crate.h"
 #include "bm_arena.h"
 #include "bm_player_system.h"
+#include "bm_shareddefs.h"
 #include "tf_gamerules.h"
+
+extern ConVar tf_ff_game_mode;
 #include "tf_player.h"
 #include "explode.h"
 
@@ -94,10 +97,35 @@ void CTFBMBomb::Spawn( void )
 
 	SpawnBombVisual();
 
-	m_flPlaceTime = gpGlobals->curtime;
+	InitFuseFromCurrentTime();
 
 	SetThink( &CTFBMBomb::BombThink );
 	SetNextThink( gpGlobals->curtime + 0.05f );
+}
+
+//-----------------------------------------------------------------------------
+void CTFBMBomb::InitFuseFromCurrentTime( void )
+{
+	const float flFuse = Max( 0.5f, tf_bm_bomb_fuse.GetFloat() );
+	m_flPlaceTime = gpGlobals->curtime;
+	m_flDetonateTime = m_flPlaceTime + flFuse;
+}
+
+//-----------------------------------------------------------------------------
+void CTFBMBomb::UpdateOnRemove( void )
+{
+	RemoveBombVisual();
+
+	if ( !m_bDetonating )
+	{
+		CTFPlayer *pOwner = ToTFPlayer( m_hOwnerPlayer.Get() );
+		if ( pOwner && pOwner->m_iBMActiveBombs > 0 )
+		{
+			pOwner->m_iBMActiveBombs--;
+		}
+	}
+
+	BaseClass::UpdateOnRemove();
 }
 
 //-----------------------------------------------------------------------------
@@ -167,10 +195,15 @@ void CTFBMBomb::RemoveBombVisual( void )
 //-----------------------------------------------------------------------------
 void CTFBMBomb::BombThink( void )
 {
-	if ( !TFGameRules() || !TFGameRules()->IsBombermanMode() )
+	if ( !TFGameRules() || tf_ff_game_mode.GetInt() != TF_FF_MODE_BOMBERMAN )
 	{
 		UTIL_Remove( this );
 		return;
+	}
+
+	if ( m_flDetonateTime <= 0.0f )
+	{
+		InitFuseFromCurrentTime();
 	}
 
 	if ( !m_bDetonating && gpGlobals->curtime >= m_flDetonateTime )
@@ -227,8 +260,6 @@ CTFBMBomb *CTFBMBomb::PlaceAtCell( CTFPlayer *pOwner, int iCellX, int iCellY )
 	pBomb->m_iCellY = iCellY;
 	pBomb->m_hOwnerPlayer = pOwner;
 	pBomb->m_iBlastRange = clamp( tf_bm_bomb_range.GetInt(), 1, 8 );
-	pBomb->m_flPlaceTime = gpGlobals->curtime;
-	pBomb->m_flDetonateTime = gpGlobals->curtime + Max( 0.5f, tf_bm_bomb_fuse.GetFloat() );
 
 	pBomb->SetAbsOrigin( vecCenter );
 	pBomb->SetAbsAngles( vec3_angle );

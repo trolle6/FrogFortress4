@@ -8,7 +8,11 @@
 #include "bm_grid.h"
 #include "tf_bm_bomb.h"
 #include "tf_bm_crate.h"
+#include "tf_bm_wall.h"
 #include "bm_arena.h"
+
+extern ConVar tf_bm_hard_walls;
+extern ConVar tf_bm_maze_crates;
 #include "tf_player.h"
 #include "tf_gamerules.h"
 #include "tf_weaponbase.h"
@@ -576,7 +580,9 @@ void BM_ConfigureMatch( void )
 	{
 		BM_EnsureArenaBuilt();
 	}
-	else if ( BM_IsMapFloorArena() && CTFBMCrate::CountCrates() <= 0 )
+	else if ( BM_IsMapFloorArena() && BM_IsArenaGameplayReady()
+		&& ( ( tf_bm_hard_walls.GetBool() && CTFBMWall::CountWalls() <= 0 )
+			|| ( tf_bm_maze_crates.GetBool() && !tf_bm_hard_walls.GetBool() && CTFBMCrate::CountCrates() <= 0 ) ) )
 	{
 		extern void BM_BuildArena( bool bWarpAllPlayers, bool bForceRebuild );
 		BM_BuildArena( false, true );
@@ -829,11 +835,11 @@ bool BM_TryPlaceBomb( CTFPlayer *pPlayer )
 		return false;
 	}
 
-	if ( !BM_IsArenaActive() )
+	if ( !BM_IsArenaGameplayReady() )
 	{
 		if ( !pPlayer->IsBot() )
 		{
-			ClientPrint( pPlayer, HUD_PRINTCENTER, "Arena not ready — wait or run bm_fix." );
+			ClientPrint( pPlayer, HUD_PRINTCENTER, "Arena still building — wait a moment." );
 		}
 		return false;
 	}
